@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <title>BẢNG VÀNG DKRS</title>
+  <style>
+    body {
+      font-family: Arial;
+      background: #f5f5f5; /* sáng hơn */
+      color: #222;
+      text-align: center;
+    }
+
+    h1 {
+      color: #d4af37;
+    }
+
+    table {
+      margin: auto;
+      border-collapse: collapse;
+      width: 60%;
+      margin-top: 20px;
+      background: white;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+    }
+
+    th, td {
+      padding: 12px;
+      border-bottom: 1px solid #ddd;
+    }
+
+    th {
+      background: #222;
+      color: white;
+    }
+
+    /* 🔥 hiệu ứng nhấp nháy */
+    @keyframes blinkGreen {
+      0% { background-color: #d4edda; }
+      50% { background-color: #28a745; color: white; }
+      100% { background-color: #d4edda; }
+    }
+
+    @keyframes blinkRed {
+      0% { background-color: #f8d7da; }
+      50% { background-color: #dc3545; color: white; }
+      100% { background-color: #f8d7da; }
+    }
+
+    .up {
+      animation: blinkGreen 1s infinite;
+    }
+
+    .down {
+      animation: blinkRed 1s infinite;
+    }
+  </style>
+</head>
+<body>
+
+<h1>🏆 BẢNG VÀNG DKRS</h1>
+
+<table id="leaderboard">
+  <thead>
+    <tr>
+      <th>Hạng</th>
+      <th>Tên</th>
+      <th>Điểm</th>
+      <th>Biến động</th>
+    </tr>
+  </thead>
+  <tbody></tbody>
+</table>
+
+<script>
+let changeTimeouts = {};
+
+// 🔥 Fake data
+function getFakeData() {
+  const names = ["A", "B", "C", "D", "E"];
+  return names.map(name => ({
+    name,
+    score: Math.floor(Math.random() * 100)
+  })).sort((a, b) => b.score - a.score);
+}
+
+// 📌 Render
+function renderLeaderboard(data, changes = {}) {
+  const tbody = document.querySelector("#leaderboard tbody");
+  tbody.innerHTML = "";
+
+  data.forEach((item, index) => {
+    let changeClass = changes[item.name] || "";
+
+    tbody.innerHTML += `
+      <tr id="row-${item.name}" class="${changeClass}">
+        <td>${index + 1}</td>
+        <td>${item.name}</td>
+        <td>${item.score}</td>
+        <td>
+          ${changeClass === "up" ? "⬆️" : changeClass === "down" ? "⬇️" : "-"}
+        </td>
+      </tr>
+    `;
+
+    // 🔥 giữ hiệu ứng 30s rồi tự tắt
+    if (changeClass) {
+      clearTimeout(changeTimeouts[item.name]);
+
+      changeTimeouts[item.name] = setTimeout(() => {
+        const row = document.getElementById(`row-${item.name}`);
+        if (row) row.classList.remove("up", "down");
+      }, 30000);
+    }
+  });
+}
+
+// 📌 Detect
+function detectChanges(oldData, newData) {
+  let changes = {};
+
+  newData.forEach((item, newIndex) => {
+    const oldIndex = oldData.findIndex(x => x.name === item.name);
+
+    if (oldIndex === -1) return;
+
+    if (oldIndex > newIndex) {
+      changes[item.name] = "up";
+    } else if (oldIndex < newIndex) {
+      changes[item.name] = "down";
+    }
+  });
+
+  return changes;
+}
+
+// 📌 localStorage
+function saveData(data) {
+  localStorage.setItem("leaderboard", JSON.stringify(data));
+}
+
+function getOldData() {
+  return JSON.parse(localStorage.getItem("leaderboard")) || [];
+}
+
+// 🚀 Main
+function updateLeaderboard() {
+  const newData = getFakeData(); // 👉 thay bằng API
+
+  const oldData = getOldData();
+
+  const changes = detectChanges(oldData, newData);
+
+  renderLeaderboard(newData, changes);
+
+  saveData(newData);
+}
+
+// run
+updateLeaderboard();
+setInterval(updateLeaderboard, 5000);
+
+</script>
+
+</body>
+</html>
