@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bảng vàng DKRS</title>
+
+<style>
+body {
+  font-family: Arial;
+  margin: 0;
+  padding: 15px;
+  background: linear-gradient(135deg, #ff0000, #990000);
+  color: white;
+  text-align: center;
+}
+
+.tabs {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.tab {
+  padding: 10px 15px;
+  border-radius: 20px;
+  background: white;
+  color: black;
+  cursor: pointer;
+  font-weight: bold;
+}
+
+.tab.active {
+  background: gold;
+}
+
+.top3 {
+  display: flex;
+  justify-content: center;
+  gap: 15px;
+  margin-bottom: 25px;
+  flex-wrap: wrap;
+}
+
+.card {
+  background: white;
+  color: black;
+  border-radius: 15px;
+  padding: 15px;
+  width: 180px;
+}
+
+.card img {
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.gold { border-top: 8px solid gold; }
+.silver { border-top: 8px solid silver; }
+.bronze { border-top: 8px solid #cd7f32; }
+
+table {
+  width: 100%;
+  background: white;
+  color: black;
+  border-collapse: collapse;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+th, td { padding: 10px; }
+
+th {
+  background: #cc0000;
+  color: white;
+}
+
+tr:nth-child(even) {
+  background: #ffe5e5;
+}
+
+img.small {
+  width: 35px;
+  height: 35px;
+  border-radius: 50%;
+  margin-right: 8px;
+}
+
+@media (max-width: 768px) {
+  .top3 {
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .card {
+    width: 90%;
+  }
+}
+</style>
+</head>
+
+<body>
+
+<h2>🏆 BẢNG VÀNG DKRS</h2>
+
+<div class="tabs">
+  <div class="tab active" onclick="switchTab('canhan', event)">Cá Nhân</div>
+  <div class="tab" onclick="switchTab('san', event)">Sàn</div>
+  <div class="tab" onclick="switchTab('phongban', event)">Phòng ban</div>
+</div>
+
+<div class="top3" id="top3"></div>
+
+<table>
+<thead id="thead"></thead>
+<tbody id="tbody"></tbody>
+</table>
+
+<script>
+const SHEETS = {
+  canhan: "https://docs.google.com/spreadsheets/d/e/2PACX-1vTDIRhQpgboK4Ow1M6V78IkV-ek6otLKE_VEFMLFHpyCC1bWsLoq0tP5AFFQQeRXpMBkVh8fmakJ-Jq/pub?gid=1218443349&single=true&output=csv",
+  san: "https://docs.google.com/spreadsheets/d/e/2PACX-1vTDIRhQpgboK4Ow1M6V78IkV-ek6otLKE_VEFMLFHpyCC1bWsLoq0tP5AFFQQeRXpMBkVh8fmakJ-Jq/pub?gid=498797782&single=true&output=csv",
+  phongban: "https://docs.google.com/spreadsheets/d/e/2PACX-1vTDIRhQpgboK4Ow1M6V78IkV-ek6otLKE_VEFMLFHpyCC1bWsLoq0tP5AFFQQeRXpMBkVh8fmakJ-Jq/pub?gid=1313067471&single=true&output=csv"
+};
+
+let currentTab = "canhan";
+let lastData = "";
+
+// ✅ CSV parser chuẩn (fix dấu phẩy thập phân)
+function parseCSV(text) {
+  const rows = [];
+  let current = '';
+  let inQuotes = false;
+  let row = [];
+
+  for (let i = 0; i < text.length; i++) {
+    const char = text[i];
+
+    if (char === '"') {
+      inQuotes = !inQuotes;
+    } else if (char === ',' && !inQuotes) {
+      row.push(current);
+      current = '';
+    } else if (char === '\n' && !inQuotes) {
+      row.push(current);
+      rows.push(row);
+      row = [];
+      current = '';
+    } else {
+      current += char;
+    }
+  }
+
+  row.push(current);
+  rows.push(row);
+
+  const headers = rows[0];
+
+  return rows.slice(1).map(r => {
+    let obj = {};
+    headers.forEach((h, i) => {
+      obj[h.trim()] = r[i];
+    });
+    return obj;
+  });
+}
+
+function switchTab(tab, e) {
+  currentTab = tab;
+  document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
+  e.target.classList.add("active");
+  lastData = "";
+  loadData();
+}
+
+function renderHeader() {
+  const thead = document.getElementById("thead");
+
+  if (currentTab === "canhan") {
+    thead.innerHTML = `
+      <tr>
+        <th>Rank</th>
+        <th>Tên</th>
+        <th>Phòng ban</th>
+        <th>Giao Dịch</th>
+      </tr>
+    `;
+  } else {
+    thead.innerHTML = `
+      <tr>
+        <th>Rank</th>
+        <th>Tên</th>
+        <th>Giao Dịch</th>
+      </tr>
+    `;
+  }
+}
+
+async function loadData() {
+  const res = await fetch(SHEETS[currentTab]);
+  const text = await res.text();
+
+  if (text === lastData) return;
+  lastData = text;
+
+  let rows = parseCSV(text).map(r => ({
+    name: r.Name,
+    value: Number((r.Value || "").replace(",", ".")),
+    avatar: r.Avatar,
+    department: r.Department || ""
+  }));
+
+  rows = rows.filter(r => r.name && !isNaN(r.value));
+  rows.sort((a, b) => b.value - a.value);
+
+  renderHeader();
+  renderTop3(rows.slice(0,3));
+  render(rows.slice(3));
+}
+
+function renderTop3(data) {
+  const container = document.getElementById("top3");
+  container.innerHTML = "";
+
+  const cls = ["gold","silver","bronze"];
+
+  data.forEach((u,i)=>{
+    const div = document.createElement("div");
+    div.className = "card " + cls[i];
+
+    div.innerHTML = `
+      <h3>#${i+1}</h3>
+      <img src="${u.avatar}">
+      <div><b>${u.name}</b></div>
+      ${currentTab === "canhan" ? `<div>${u.department}</div>` : ""}
+      <div><b>Giao Dịch:</b> ${u.value.toLocaleString('vi-VN')}</div>
+    `;
+
+    container.appendChild(div);
+  });
+}
+
+function render(data) {
+  const tbody = document.getElementById("tbody");
+  tbody.innerHTML = "";
+
+  data.forEach((u,i)=>{
+    const tr = document.createElement("tr");
+
+    if (currentTab === "canhan") {
+      tr.innerHTML = `
+        <td>${i+4}</td>
+        <td><img class="small" src="${u.avatar}"> ${u.name}</td>
+        <td>${u.department}</td>
+        <td>${u.value.toLocaleString('vi-VN')}</td>
+      `;
+    } else {
+      tr.innerHTML = `
+        <td>${i+4}</td>
+        <td><img class="small" src="${u.avatar}"> ${u.name}</td>
+        <td>${u.value.toLocaleString('vi-VN')}</td>
+      `;
+    }
+
+    tbody.appendChild(tr);
+  });
+}
+
+loadData();
+setInterval(loadData, 5000);
+</script>
+
+</body>
+</html>
